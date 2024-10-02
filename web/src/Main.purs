@@ -1,5 +1,6 @@
 module Main where
 
+import Content (pageContent)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Deku.Control as DC
@@ -26,11 +27,13 @@ main = do
 header :: Nut
 header =
   DD.header [ DA.klass_ "pf-v5-c-masthead" ]
-    [ DD.div [ DA.klass_ "pf-v5-c-masthead__main" ] []
-    , DD.div [ DA.klass_ "pf-v5-c-masthead__content" ]
-        [ DD.div []
-            [ DC.text_ "TITLE"
+    [ DD.div [ DA.klass_ "pf-v5-c-masthead__main" ]
+        [ DD.h2 [ DA.klass_ "pf-v5-c-title pf-m-xl" ]
+            [ DC.text_ "Coffee"
             ]
+        ]
+    , DD.div [ DA.klass_ "pf-v5-c-masthead__content" ]
+        [
         ]
     ]
 
@@ -38,9 +41,8 @@ pageBody :: Nut
 pageBody =
   DD.main [ DA.klass_ "pf-v5-c-page__main" ]
     [ DD.section [ DA.klass_ "pf-v5-c-page__main-section" ]
-        []
+        [ pageContent ]
     ]
-
 
 dekuApp :: Effect Nut
 dekuApp = do

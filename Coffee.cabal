@@ -11,7 +11,7 @@ cabal-version:      3.0
 --   http://haskell.org/cabal/users-guide/
 --
 -- The name of the package.
-name:               AssistantPi
+name:               Coffee
 
 -- The package version.
 -- See the Haskell package versioning policy (PVP) for standards
@@ -20,7 +20,7 @@ name:               AssistantPi
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            0.0.0.0
+version:            0.1.0.0
 
 -- A short (one-line) description of the package.
 -- synopsis:
@@ -54,7 +54,7 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall
 
-executable AssistantPi
+executable Coffee
     -- Import common warning flags.
     import:           warnings
 

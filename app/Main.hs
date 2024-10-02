@@ -20,16 +20,20 @@ import Servant (Handler, Server, serveDirectoryWith)
 import Servant.API
 import Servant.Server (Application, serve)
 import System.Directory
+import System.Environment (getArgs)
 import System.OsPath
 import WaiAppStatic.Types (unsafeToPiece)
 
 -- * Types
 
-data Record = Record { id :: T.Text
-                     , username :: T.Text
-                     , review :: T.Text
-                     , rating :: Int
-                     }deriving (Generic)
+data Record = Record
+  { id :: T.Text,
+    undertones :: T.Text,
+    aroma :: T.Text,
+    thoughts :: T.Text,
+    rating :: Int
+  }
+  deriving (Generic)
 
 newtype CoffeeCompany = CC T.Text deriving (Eq, Generic)
 
@@ -79,9 +83,10 @@ type CoffeeApi =
              :<|> ReqBody '[JSON] Record :> Post '[JSON] ()
              :<|> Delete '[PlainText] T.Text
          )
-    :<|> Raw
 
-type Api = "api" :> "v1" :> CoffeeApi
+type Api =
+  "api" :> "v1" :> CoffeeApi
+    :<|> Raw
 
 data DatabaseMngr = DBMngr
   { dbMVar :: MVar Database,
@@ -111,15 +116,16 @@ instance DBUpdater DatabaseMngr where
     commit jsonPath newDB
     putMVar dbMVar newDB
 
-server :: DatabaseMngr -> Server Api
-server mngr =
-  getDBHandler mngr
-    :<|> ( \coffeeCo coffee ->
-             getHandler mngr coffeeCo coffee
-               :<|> postHandler mngr coffeeCo coffee
-               :<|> deleteHandler mngr coffeeCo coffee
-         )
-    :<|> serveFiles
+server :: FilePath -> DatabaseMngr -> Server Api
+server path mngr =
+  ( getDBHandler mngr
+      :<|> ( \coffeeCo coffee ->
+               getHandler mngr coffeeCo coffee
+                 :<|> postHandler mngr coffeeCo coffee
+                 :<|> deleteHandler mngr coffeeCo coffee
+           )
+  )
+    :<|> serveFiles path
 
 getDBHandler :: DatabaseMngr -> Handler Database
 getDBHandler (DBMngr dbMVar _jsonPath) = do
@@ -141,9 +147,9 @@ postHandler mngr company coffee newRecord = do
 deleteHandler :: DatabaseMngr -> T.Text -> T.Text -> Handler T.Text
 deleteHandler = undefined
 
-serveFiles :: Server Raw
-serveFiles = do
-  let initSettings = defaultWebAppSettings "web/dist"
+serveFiles :: FilePath -> Server Raw
+serveFiles path = do
+  let initSettings = defaultWebAppSettings path
       staticSettings =
         initSettings
           { ssRedirectToIndex = True,
@@ -151,8 +157,8 @@ serveFiles = do
           }
   serveDirectoryWith staticSettings
 
-app :: DatabaseMngr -> Application
-app mngr = serve (Proxy @Api) $ server mngr
+app :: FilePath -> DatabaseMngr -> Application
+app path mngr = serve (Proxy @Api) $ server path mngr
 
 -- * Database
 
@@ -182,7 +188,13 @@ commit ospath val = do
 
 main :: IO ()
 main = do
-  dbPath <- encodeUtf "./database.json"
-  dbMVar <- loadDB dbPath >>= newMVar
-  putStrLn "Running server on 8080..."
-  run 8080 (app $ DBMngr dbMVar dbPath)
+  args <- getArgs
+  if null args
+    then putStrLn "No web supplied"
+    else do
+      absPath <- canonicalizePath $ head args
+      print absPath
+      dbPath <- encodeUtf "./database.json"
+      dbMVar <- loadDB dbPath >>= newMVar
+      putStrLn "Running server on 8080..."
+      run 8080 (app absPath $ DBMngr dbMVar dbPath)
