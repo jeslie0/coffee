@@ -53,9 +53,9 @@ currentCoffeePage =
           setRating initialFormData.rating
 
       DD.form [ DA.klass_ "pf-v5-c-form", DA.novalidate_ "", DL.submit_ preventDefault ]
-        [ makeTextInputForm "Aroma" aromaTxt setAromaTxt
-        , makeTextInputForm "Undertones" undertonesTxt setUndertonesTxt
-        , makeTextInputForm "Thoughts" thoughtsTxt setThoughtsTxt
+        [ makeTextInputForm "Aroma" "" aromaTxt setAromaTxt
+        , makeTextInputForm "Undertones" "" undertonesTxt setUndertonesTxt
+        , makeTextInputForm "Thoughts" ""thoughtsTxt setThoughtsTxt
         , ratingRadios rating setRating
         , buttons sendData resetData
         ]

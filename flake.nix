@@ -4,13 +4,14 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     ps-overlay.url = "github:thomashoneyman/purescript-overlay";
+    mkSpagoDerivation.url = "github:jeslie0/mkSpagoDerivation";
     haskellNix = {
       url = "github:jeslie0/haskell.nix";
       # inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, ps-overlay, haskellNix }:
+  outputs = { self, nixpkgs, ps-overlay, mkSpagoDerivation, haskellNix }:
     let
       supportedSystems =
         [ "aarch64-linux" "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
@@ -21,25 +22,22 @@
       nixpkgsFor = forAllSystems (system:
         import nixpkgs {
           inherit system;
-          overlays = [ haskellNix.overlay ps-overlay.overlays.default ];
+          overlays = [ haskellNix.overlay
+                       ps-overlay.overlays.default
+                       mkSpagoDerivation.overlays.default
+                     ];
         });
 
       ghcVersion =
         "ghc965";
 
-      extendHaskellPackages = { haskellPackages, alsa-lib }:
-        haskellPackages.extend ( hpFinal: hpPrev: {
-            alsa-hs =
-              hpPrev.callCabal2nix "alsa-hs" ./libs/alsa-hs { inherit alsa-lib; };
-        });
+      extendHaskellPackages = { haskellPackages }:
+        haskellPackages.extend ( hpFinal: hpPrev: {});
 
       haskellPackages = system:
         extendHaskellPackages {
           haskellPackages =
             nixpkgsFor.${system}.haskell.packages.${ghcVersion};
-
-          alsa-lib =
-            nixpkgsFor.${system}.alsa-lib.dev;
         };
 
       packageName = system: with builtins;
@@ -76,7 +74,6 @@
                   packageName system;
               })
           );
-
 
         devShell =
           forAllSystems (system:

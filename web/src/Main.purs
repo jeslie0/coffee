@@ -15,6 +15,7 @@ import Deku.Toplevel (runInBody)
 import Effect (Effect)
 import FRP.Poll (Poll)
 import Page (Page(..), pageList)
+import Page.CoffeeTasting (coffeeTastingPage)
 import Page.CurrentCoffee (currentCoffeePage)
 import Page.Information (informationPage)
 import Page.PreviousResults (previousResultsPage)
@@ -55,6 +56,8 @@ pageBody pagePoll =
     [ DD.section [ DA.klass_ "pf-v5-c-page__main-section" ]
         [ pagePoll <#~>
             case _ of
+              CoffeeTasting -> coffeeTastingPage
+
               CurrentCoffee -> currentCoffeePage
 
               PreviousResults -> previousResultsPage
@@ -66,7 +69,7 @@ pageBody pagePoll =
 dekuApp :: Effect Nut
 dekuApp =
   pure Deku.do
-    setActivePage /\ activePage <- DH.useState CurrentCoffee
+    setActivePage /\ activePage <- DH.useState CoffeeTasting
     DD.div [ DA.klass_ "pf-v5-c-page" ]
       [ header activePage setActivePage
       , pageBody activePage

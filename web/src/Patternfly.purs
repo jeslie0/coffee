@@ -2,16 +2,27 @@ module Patternfly where
 
 import Prelude
 
+import Control.Monad.Cont (lift)
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
+import Data.Array as Array
+import Data.Int (toNumber, round)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), uncurry)
 import Deku.Control as DC
 import Deku.Core (Nut)
 import Deku.DOM as DD
-import Deku.DOM.Listeners as DL
 import Deku.DOM.Attributes as DA
+import Deku.DOM.Listeners as DL
+import Deku.Do as Deku
+import Deku.Hooks as DH
 import Effect (Effect)
 import FRP.Poll (Poll)
+import Web.DOM.Element (getBoundingClientRect)
+import Web.DOM.Node (fromEventTarget, parentElement)
 import Web.Event.Event (currentTarget)
+import Web.Event.Event as Event
 import Web.HTML.HTMLInputElement as Input
+import Web.UIEvent.MouseEvent (MouseEvent, screenX, toEvent)
 
 gallery :: Array Nut -> Nut
 gallery =
@@ -35,8 +46,8 @@ dlistGroup name termPoll =
         ]
     ]
 
-makeTextInputForm :: String -> Poll String -> (String -> Effect Unit) -> Nut
-makeTextInputForm name content setContent =
+makeTextInputForm :: String -> String -> Poll String -> (String -> Effect Unit) -> Nut
+makeTextInputForm name helperText content setContent =
   DD.div [ DA.klass_ "pf-v5-c-form__group" ]
     [ DD.div [ DA.klass_ "pf-v5-c-form__label" ]
         [ DD.label [ DA.klass_ "pf-v5-c-form__label", DA.for_ $ name <> "-form" ]
@@ -56,6 +67,12 @@ makeTextInputForm name content setContent =
                 , DL.change_ updateContent
                 ]
                 []
+            ]
+        , DD.div [ DA.klass_ "pf-v5-c-form__helper-text", DA.ariaLive_ "polite" ]
+            [ DD.div [ DA.klass_ "pf-v5-c-helper-text" ]
+                [ DD.div [ DA.klass_ "pf-v5-c-helper-text__item" ]
+                    [ DD.span [ DA.klass_ "pf-v5-c-helper-text__item-text" ] [ DC.text_ helperText ] ]
+                ]
             ]
         ]
     ]
@@ -132,3 +149,92 @@ popover =
             [ DC.text_ "Body!" ]
         ]
     ]
+
+tabItem :: String -> Poll Boolean -> Effect Unit -> Nut
+tabItem title isActivePoll onClick =
+  DD.li
+    [ DA.klass $ pure "pf-v5-c-tabs__item" <> (isActivePoll <#> if _ then " pf-m-current" else "")
+    , DA.role_ "presentation"
+    ]
+    [ DD.button
+        [ DA.xtype_ "button"
+        , DA.klass_ "pf-v5-c-tabs__link"
+        , DA.role_ "tab"
+        ]
+        [ DD.span
+            [ DA.klass_ "pf-v5-c-tabs__item-text"
+            , DL.click_ $ \_ -> onClick
+            ]
+            [ DC.text_ title ]
+        ]
+    ]
+
+makeSlider :: Array (Tuple String Number) -> Poll Number -> (Number -> Effect Unit) -> Nut
+makeSlider stepData currentPercentPoll changePercent = Deku.do
+  Tuple setIsMouseDown isMouseDown <- DH.useHot false
+  isMouseDownEff <- DH.useRef false isMouseDown
+  DD.div
+    [ DA.klass_ "pf-v5-c-slider"
+    , DA.style $ pure "--pf-v5-c-slider--value: " <> (show <$> currentPercentPoll) <> pure "%"
+    ]
+    [ DD.div [ DA.klass_ "pf-v5-c-slider__main" ]
+        [ DD.div [ DA.klass_ "pf-v5-c-slider__rail" ]
+            [ DD.div [ DA.klass_ "pf-v5-c-slider__rail-track" ] [] ]
+        , DD.div [ DA.klass_ "pf-v5-c-slider__steps" ] $
+            stepData <#> uncurry sliderStep
+        , DD.div
+            [ DA.klass_ "pf-v5-c-slider__thumb"
+            , DA.role_ "slider"
+            , DL.mousedown_ $ \_ -> setIsMouseDown true
+            , DL.mouseup_ $ \_ -> setIsMouseDown false
+            , DL.mousemove_ $ onMouseMove isMouseDownEff
+            , DL.mouseleave_ $ \_ -> setIsMouseDown false
+            ]
+            []
+        ]
+    ]
+  where
+  sliderStep label percent =
+    DD.div
+      [ DA.klass_ "pf-v5-c-slider__step pf-m-active"
+      , DA.style_ $ "--pf-v5-c-slider__step--Left: " <> show percent <> "%"
+      ]
+      [ DD.div [ DA.klass_ "pf-v5-c-slider__step-tick" ] []
+      , DD.div [ DA.klass_ "pf-v5-c-slider__step-label" ] [ DC.text_ label ]
+      ]
+
+  onMouseMove :: Effect Boolean -> MouseEvent -> Effect Unit
+  onMouseMove isMouseDownEff mouseEvent = do
+    isMouseDown <- isMouseDownEff
+    if not isMouseDown then pure unit
+    else do
+      -- Get parent div's bounding X range, then figure out how far
+      -- along we are in percent. Round to nearest percent
+      let
+        event = toEvent mouseEvent
+        mouseScreenX = screenX mouseEvent
+      val <- getParentXRange event
+      case val of
+        Nothing -> pure unit
+        Just range -> do
+          let
+            newPercent = rangePercent range (toNumber mouseScreenX)
+            roundedPercent = min 100 (max 0 $ roundNeareastMultiple (100 / (Array.length stepData - 1)) newPercent)
+          changePercent (toNumber roundedPercent)
+
+getParentXRange :: Event.Event -> Effect (Maybe { left :: Number, right :: Number })
+getParentXRange event =
+  runMaybeT do
+    targetEvent <- MaybeT <<< pure $ currentTarget event
+    targetNode <- MaybeT <<< pure $ fromEventTarget targetEvent
+    parElement <- MaybeT $ parentElement targetNode
+    boundingRect <- lift $ getBoundingClientRect parElement
+    pure { left: boundingRect.left, right: boundingRect.right }
+
+rangePercent :: { left :: Number, right :: Number } -> Number -> Number
+rangePercent { left, right } x =
+  100.0 * (x - left) / (right - left)
+
+roundNeareastMultiple :: Int -> Number -> Int
+roundNeareastMultiple multiple val =
+  multiple * round (val / toNumber multiple)
