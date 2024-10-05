@@ -9,12 +9,15 @@ workspace:
           - deku-css
           - deku-dom
           - effect
+          - fetch
           - js-timers
           - numbers
           - prelude
           - random
+          - yoga-json
         build_plan:
           - aff
+          - arraybuffer-types
           - arrays
           - assert
           - avar
@@ -38,6 +41,7 @@ workspace:
           - exceptions
           - exists
           - fast-vect
+          - fetch
           - filterable
           - foldable-traversable
           - foreign
@@ -47,12 +51,16 @@ workspace:
           - functors
           - gen
           - heterogeneous
+          - http-methods
           - hyrule
           - identity
           - integers
           - invariant
           - js-bigints
           - js-date
+          - js-fetch
+          - js-promise
+          - js-promise-aff
           - js-timers
           - lazy
           - lcg
@@ -100,6 +108,7 @@ workspace:
           - web-html
           - web-pointerevents
           - web-storage
+          - web-streams
           - web-touchevents
           - web-uievents
           - yoga-json
@@ -664,6 +673,11 @@ packages:
       - tailrec
       - transformers
       - unsafe-coerce
+  arraybuffer-types:
+    type: registry
+    version: 3.0.2
+    integrity: sha256-mQKokysYVkooS4uXbO+yovmV/s8b138Ws3zQvOwIHRA=
+    dependencies: []
   arrays:
     type: registry
     version: 7.3.0
@@ -945,6 +959,30 @@ packages:
       - tuples
       - unfoldable
       - unsafe-coerce
+  fetch:
+    type: registry
+    version: 4.1.0
+    integrity: sha256-zCwBUkRL9n6nUhK1+7UqqsuxswPFATsZfGSBOA3NYYY=
+    dependencies:
+      - aff
+      - arraybuffer-types
+      - bifunctors
+      - effect
+      - either
+      - foreign
+      - http-methods
+      - js-fetch
+      - js-promise
+      - js-promise-aff
+      - maybe
+      - newtype
+      - ordered-collections
+      - prelude
+      - record
+      - strings
+      - typelevel-prelude
+      - web-file
+      - web-streams
   filterable:
     type: registry
     version: 5.0.0
@@ -1072,6 +1110,14 @@ packages:
       - record
       - tuples
       - variant
+  http-methods:
+    type: registry
+    version: 6.0.0
+    integrity: sha256-Orr7rbDGcp7qoqmUMXPRMjBx+C4jqOQcFe9+gE3nMgU=
+    dependencies:
+      - either
+      - prelude
+      - strings
   hyrule:
     type: git
     url: https://github.com/mikesol/purescript-hyrule.git
@@ -1126,6 +1172,48 @@ packages:
       - foreign
       - integers
       - now
+  js-fetch:
+    type: registry
+    version: 0.2.1
+    integrity: sha256-zQaVi9wFWku1SsWmdR11kRpOb+wxkNWR49cn928ucjw=
+    dependencies:
+      - arraybuffer-types
+      - arrays
+      - effect
+      - foldable-traversable
+      - foreign
+      - foreign-object
+      - functions
+      - http-methods
+      - js-promise
+      - maybe
+      - newtype
+      - prelude
+      - record
+      - tuples
+      - typelevel-prelude
+      - unfoldable
+      - web-file
+      - web-streams
+  js-promise:
+    type: registry
+    version: 1.0.0
+    integrity: sha256-kXNo5g9RJgPdrTuKRe5oG2kBIwPp+j5VDPDplqZBJzQ=
+    dependencies:
+      - effect
+      - exceptions
+      - foldable-traversable
+      - functions
+      - maybe
+      - prelude
+  js-promise-aff:
+    type: registry
+    version: 1.0.0
+    integrity: sha256-s9kml9Ei74hKlMMg41yyZp4GkbmYUwaH+gBWWrdhwec=
+    dependencies:
+      - aff
+      - foreign
+      - js-promise
   js-timers:
     type: registry
     version: 6.1.0
@@ -1593,6 +1681,18 @@ packages:
     dependencies:
       - nullable
       - web-events
+  web-streams:
+    type: registry
+    version: 4.0.0
+    integrity: sha256-02HgXIk6R+pU9fWOX42krukAI1QkCbLKcCv3b4Jq6WI=
+    dependencies:
+      - arraybuffer-types
+      - effect
+      - exceptions
+      - js-promise
+      - nullable
+      - prelude
+      - tuples
   web-touchevents:
     type: registry
     version: 4.0.0

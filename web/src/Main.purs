@@ -1,22 +1,23 @@
 module Main where
 
-import Content (pageContent)
-import Data.Tuple (Tuple(..))
+import Prelude
+
 import Data.Tuple.Nested ((/\))
 import Deku.Control as DC
 import Deku.Core (Nut)
 import Deku.DOM as DD
-import Deku.DOM.Attributes (klass, klass_, role_) as DA
+import Deku.DOM.Attributes as DA
 import Deku.DOM.Listeners as DL
 import Deku.Do as Deku
-import Deku.Effect as DE
 import Deku.Hooks ((<#~>))
 import Deku.Hooks as DH
 import Deku.Toplevel (runInBody)
 import Effect (Effect)
-import Effect.Console as Console
 import FRP.Poll (Poll)
-import Prelude (Unit, bind, discard, pure, show, unit, ($), (<#>), (<>), (==))
+import Page (Page(..), pageList)
+import Page.CurrentCoffee (currentCoffeePage)
+import Page.Information (informationPage)
+import Page.PreviousResults (previousResultsPage)
 
 main :: Effect Unit
 main = do
@@ -24,8 +25,8 @@ main = do
   _ <- runInBody app
   pure unit
 
-header :: Nut
-header =
+header :: Poll Page -> (Page -> Effect Unit) -> Nut
+header ev setPage =
   DD.header [ DA.klass_ "pf-v5-c-masthead" ]
     [ DD.div [ DA.klass_ "pf-v5-c-masthead__main" ]
         [ DD.h2 [ DA.klass_ "pf-v5-c-title pf-m-xl" ]
@@ -33,22 +34,40 @@ header =
             ]
         ]
     , DD.div [ DA.klass_ "pf-v5-c-masthead__content" ]
-        [
+        [ DD.nav [ DA.klass_ "pf-v5-c-nav pf-m-horizontal" ]
+            [ DD.ul [ DA.klass_ "pf-v5-c-nav__list", DA.role_ "list" ]
+                navList
+            ]
+        ]
+    ]
+  where
+  navList = pageList <#> \page ->
+    DD.li
+      [ DA.klass $ ev <#> \activePage ->
+          "pf-v5-c-nav__link" <> if page == activePage then " pf-m-current" else ""
+      , DL.click_ $ \_ -> setPage page
+      ]
+      [ DC.text_ $ show page ]
+
+pageBody :: Poll Page -> Nut
+pageBody pagePoll =
+  DD.main [ DA.klass_ "pf-v5-c-page__main" ]
+    [ DD.section [ DA.klass_ "pf-v5-c-page__main-section" ]
+        [ pagePoll <#~>
+            case _ of
+              CurrentCoffee -> currentCoffeePage
+
+              PreviousResults -> previousResultsPage
+
+              CoffeeInfo -> informationPage
         ]
     ]
 
-pageBody :: Nut
-pageBody =
-  DD.main [ DA.klass_ "pf-v5-c-page__main" ]
-    [ DD.section [ DA.klass_ "pf-v5-c-page__main-section" ]
-        [ pageContent ]
-    ]
-
 dekuApp :: Effect Nut
-dekuApp = do
-
+dekuApp =
   pure Deku.do
+    setActivePage /\ activePage <- DH.useState CurrentCoffee
     DD.div [ DA.klass_ "pf-v5-c-page" ]
-      [ header
-      , pageBody
+      [ header activePage setActivePage
+      , pageBody activePage
       ]
