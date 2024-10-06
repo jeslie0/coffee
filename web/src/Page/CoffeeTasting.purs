@@ -2,9 +2,9 @@ module Page.CoffeeTasting (coffeeTastingPage) where
 
 import Prelude
 
+import Api (Api, sendFormData)
+import CoffeeTastingData (initialCoffeeTastingData)
 import Data.Array as Array
-import Data.Either (Either(..))
-import Data.HTTP.Method (Method(..))
 import Data.Int (toNumber, round)
 import Data.Tuple.Nested ((/\))
 import Deku.Control as DC
@@ -14,16 +14,11 @@ import Deku.DOM.Attributes as DA
 import Deku.DOM.Listeners as DL
 import Deku.Do as Deku
 import Deku.Hooks as DH
-import Deku.Pursx (pursx)
-import Effect (Effect)
-import Effect.Aff (attempt, launchAff_)
-import Effect.Class (liftEffect)
-import Effect.Console as Console
-import Fetch (fetch)
-import Page (Page(..))
-import Patternfly (makeSlider, makeRadio, makeTextInputForm, tabItem)
+import Effect.Class.Console as Console
+import Effect.Ref (Ref)
+import FRP.Poll (Poll)
+import Patternfly (gallery, galleryItem, makeDropdown, makeSliderForm, makeTextInputForm)
 import Web.Event.Event (preventDefault)
-import Yoga.JSON (writeJSON)
 
 data Categories
   = Aroma
@@ -34,45 +29,25 @@ data Categories
   | Flavour
   | Rating
 
-type FullTableData =
-  { quantityData :: CoffeeTastingData
-  , qualityData :: CoffeeTastingData
-  }
-
-initialFullTableData :: FullTableData
-initialFullTableData =
-  { quantityData: initialCoffeeTastingData
-  , qualityData: initialCoffeeTastingData
-  }
-
-type CoffeeTastingData =
-  { aroma :: Int
-  , acidity :: Int
-  , sweetness :: Int
-  , body :: Int
-  , finish :: Int
-  , flavour :: Int
-  , rating :: Int
-  }
-
-initialCoffeeTastingData :: CoffeeTastingData
-initialCoffeeTastingData =
-  { aroma: 0
-  , acidity: 0
-  , sweetness: 0
-  , body: 0
-  , finish: 0
-  , flavour: 0
-  , rating: 0
-  }
-
-coffeeTastingPage :: Nut
-coffeeTastingPage =
-  DD.div [ DA.klass_ "pf-v5-c-card" ]
-    [ DD.div [ DA.klass_ "pf-v5-c-card__title" ]
-        [ DD.h2 [ DA.klass_ "pf-v5-c-card__title-text" ] [ DC.text_ "Coffee tasting form" ] ]
-    , DD.div [ DA.klass_ "pf-v5-c-card__body" ] [ body ]
-    , DD.div [ DA.klass_ "pf-v5-c-card__footer" ] [ footer ]
+coffeeTastingPage :: Ref Api -> Poll (Array String) -> Nut
+coffeeTastingPage api coffeeList =
+  gallery
+    [ galleryItem $
+        [ DD.div [ DA.klass_ "pf-v5-c-card pf-m-full-height pf-m-display-lg" ]
+            [ DD.div [ DA.klass_ "pf-v5-c-card__title" ]
+                [ DD.h2 [ DA.klass_ "pf-v5-c-card__title-text" ] [ DC.text_ "Coffee tasting guide" ] ]
+            , DD.div [ DA.klass_ "pf-v5-c-card__body" ] [ guideBody ]
+            , DD.div [ DA.klass_ "pf-v5-c-card__body" ] [ guideNotes ]
+            ]
+        ]
+    , galleryItem $
+        [ DD.div [ DA.klass_ "pf-v5-c-card pf-m-full-height pf-m-display-lg" ]
+            [ DD.div [ DA.klass_ "pf-v5-c-card__title" ]
+                [ DD.h2 [ DA.klass_ "pf-v5-c-card__title-text" ] [ DC.text_ "Coffee tasting form" ] ]
+            , DD.div [ DA.klass_ "pf-v5-c-card__body" ] [ body api coffeeList ]
+            , DD.div [ DA.klass_ "pf-v5-c-card__footer" ] [ footer ]
+            ]
+        ]
     ]
 
 categories :: Array Categories
@@ -87,93 +62,80 @@ instance Show Categories where
   show Flavour = "Flavour"
   show Rating = "Rating"
 
-body :: Nut
-body = Deku.do
-  DD.table [ DA.klass_ "pf-v5-c-table pf-m-grid-sm", DA.role_ "grid" ]
-    [ caption, thead, tbody ]
+body :: Ref Api -> Poll (Array String) -> Nut
+body api coffeeList = Deku.do
+  setCoffeeData /\ coffeeData <- DH.useState initialCoffeeTastingData
+  coffeeDataEff <- DH.useRef initialCoffeeTastingData coffeeData
+
+  setDropdownOpen /\ dropdownOpen <- DH.useState false
+
+  let
+    formMaker label get set =
+      makeSliderForm label rangeArray (toNumber <<< get <$> coffeeData) (\n -> coffeeDataEff >>= \tData -> setCoffeeData $ set tData n)
+
+    send = coffeeDataEff >>= sendFormData api
+    reset = setCoffeeData initialCoffeeTastingData
+
+    coffeeListPoll = coffeeList <#> \arr -> arr <#> \str -> str /\ (coffeeDataEff >>= \cdata -> setCoffeeData $ cdata { coffee = str })
+
+  DD.form [ DA.klass_ "pf-v5-c-form pf-m-horizontal", DA.novalidate_ "", DL.submit_ preventDefault ]
+    [ makeDropdown "Coffee" dropdownOpen setDropdownOpen (coffeeData <#> _.coffee) coffeeListPoll
+    , formMaker "Aroma" (_.aroma) (\tData n -> tData { aroma = round n })
+    , formMaker "Acidity" (_.acidity) (\tData n -> tData { acidity = round n })
+    , formMaker "Sweetness" (_.sweetness) (\tData n -> tData { sweetness = round n })
+    , formMaker "Body" (_.body) (\tData n -> tData { body = round n })
+    , formMaker "Finish" (_.finish) (\tData n -> tData { finish = round n })
+    , formMaker "Rating" (_.rating) (\tData n -> tData { rating = round n })
+    , makeTextInputForm "Flavour" "" (_.flavour <$> coffeeData) (\str -> coffeeDataEff >>= \cf -> setCoffeeData $ cf { flavour = str })
+    , buttons coffeeData send reset
+    ]
+
   where
-  caption =
-    DD.caption [ DA.klass_ "pf-v5-c-table__caption" ] [ DC.text_ tableCaption ]
-
-  thead =
-    DD.thead [ DA.klass_ "pf-v5-c-table__thead" ]
-      [ DD.tr
-          [ DA.klass_ "pf-v5-c-table__tr", DA.role_ "row" ] $
-          categories <#> \category ->
-            DD.th [ DA.klass_ "pf-v5-c-table__th", DA.role_ "columnheader", DA.scope_ "col" ]
-              [ DC.text_ $ show category ]
-      ]
-
-  tbody = Deku.do
-    setTableData /\ tableData <- DH.useState initialFullTableData
-    tableDataEff <- DH.useRef initialFullTableData tableData
-    DD.tbody [ DA.klass_ "pf-v5-c-table__tbody", DA.role_ "rowgroup" ]
-      [ DD.tr [ DA.klass_ "pf-v5-c-table__tr", DA.role_ "row" ]
-          [ DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.aroma <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { aroma = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.acidity <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { acidity = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.sweetness <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { sweetness = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.body <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { body = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.finish <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { finish = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.flavour <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { flavour = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.quantityData.rating <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { quantityData = tData.quantityData { rating = round n } }
-              ]
-          ]
-      , DD.tr [ DA.klass_ "pf-v5-c-table__tr", DA.role_ "row" ]
-          [ DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.aroma <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { aroma = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.acidity <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { acidity = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.sweetness <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { sweetness = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.body <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { body = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.finish <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { finish = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.flavour <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { flavour = round n } }
-              ]
-          , DD.td [ DA.klass_ "pf-v5-c-table__td", DA.role_ "cell" ]
-              [ makeSlider rangeArray (toNumber <<< _.qualityData.rating <$> tableData) $
-                  \n -> tableDataEff >>= \tData -> setTableData $ tData { qualityData = tData.qualityData { rating = round n } }
-              ]
-          ]
-      ]
-
   rangeArray = Array.range 0 5 <#> \n -> show n /\ toNumber n / 5.0 * 100.0
 
+  buttons coffeeData send reset =
+    DD.div [ DA.klass_ "pf-m-action" ]
+      [ DD.div [  ]
+          [ DD.button
+              [ DA.klass_ "pf-v5-c-button pf-m-primary"
+              , DA.xtype_ "submit"
+              , DL.click_ $ \_ -> send
+              , DA.disabled $ coffeeData <#> \cdata -> if cdata.coffee == "" then "true" else "false"
+              ]
+              [ DC.text_ "Submit form" ]
+          , DD.button
+              [ DA.klass_ "pf-v5-c-button pf-m-link"
+              , DA.xtype_ "submit"
+              , DL.click_ $ \_ -> reset
+              ]
+              [ DC.text_ "Reset form" ]
+          ]
+      ]
+
+footer :: Nut
 footer =
   DD.div [] []
 
-tableCaption :: String
-tableCaption = "Table caption"
+guideBody :: Nut
+guideBody =
+  DD.div [ DA.klass_ "pf-v5-c-content" ]
+    [ DD.p []
+        [ DC.text_ "One of the best ways to improve your coffee drinking experience is to drink coffee that you like and one of the best ways to drink coffee you like is to try and determine what parts of the flavour of coffee you like. The form on this page will help you focus on different aspects of the flavour of coffee, so you can more easily determine which properties you like. There are no wrong answers when it comes to coffee preference." ]
+    , DD.p []
+        [ DC.text_ "Each of the properties in the form is equipped with a slider. The slider value represents how much of the property you detect, rather than an opinion on that aspect. The Rating slider is for how much you enjoy the coffee. There is also an text box at the bottom to add notes on the coffee, such as any flavours that your detect." ]
+    , DD.p []
+        [ DC.text_ "The most important part is to have fun and enjoy the magic bean juice!" ]
+    ]
+
+guideNotes :: Nut
+guideNotes =
+  DD.div [ DA.klass_ "pf-v5-c-content" ]
+    [ DD.ul [ DA.klass_ "pf-v5-c-list", DA.role_ "list" ]
+        [ DD.li__ "Aroma: The smell of the coffee. How intense is the aroma before you start to drink?"
+        , DD.li__ "Acidity: Think of this as the brightness, crispness or juiciness of the coffee. It is generally more prominent in lighter roast."
+        , DD.li__ "Sweetness: Some coffees are sweeter than others. How sweet is the coffee you are drinking?"
+        , DD.li__ "Body: Sometimes called \"mouthfeel\", the body of a coffee refers to the texture of the coffee when in the mouth. Does it feel fuller and heavier or lighter?"
+        , DD.li__ "Finish: How does the coffee feel when you have swallowed? Does the coffee flavour linger or does it disappear?"
+        , DD.li__ "Flavour: What words come to mind when describing the coffee? Do you detect any fruitiness, bitterness or nuttiness? There are no wrong answers - you might have a different opinion from everyone else."
+        ]
+    ]

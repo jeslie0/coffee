@@ -12,6 +12,7 @@ package:
     - numbers
     - prelude
     - random
+    - uuid
     - yoga-json
   test:
     main: Test.Main

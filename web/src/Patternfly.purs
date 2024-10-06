@@ -14,8 +14,11 @@ import Deku.DOM as DD
 import Deku.DOM.Attributes as DA
 import Deku.DOM.Listeners as DL
 import Deku.Do as Deku
+import Deku.Hooks ((<#~>))
 import Deku.Hooks as DH
 import Effect (Effect)
+import Effect.Class (liftEffect)
+import Effect.Class.Console as Console
 import FRP.Poll (Poll)
 import Web.DOM.Element (getBoundingClientRect)
 import Web.DOM.Node (fromEventTarget, parentElement)
@@ -28,7 +31,7 @@ gallery :: Array Nut -> Nut
 gallery =
   DD.div
     [ DA.klass_ "pf-v5-l-gallery pf-m-gutter"
-    , DA.style_ "--pf-v5-l-gallery--GridTemplateColumns--min: 33%;"
+    , DA.style_ "--pf-v5-l-gallery--GridTemplateColumns--min-on-lg: 49%; --pf-v5-l-gallery--GridTemplateColumns--min: 50%;"
     ]
 
 galleryItem :: Array Nut -> Nut
@@ -48,18 +51,20 @@ dlistGroup name termPoll =
 
 makeTextInputForm :: String -> String -> Poll String -> (String -> Effect Unit) -> Nut
 makeTextInputForm name helperText content setContent =
-  DD.div [ DA.klass_ "pf-v5-c-form__group" ]
+  DD.div [ DA.klass_ "pf-v5-c-form__group", DA.style_ "max-width: 500px" ]
     [ DD.div [ DA.klass_ "pf-v5-c-form__label" ]
         [ DD.label [ DA.klass_ "pf-v5-c-form__label", DA.for_ $ name <> "-form" ]
             [ DD.span [ DA.klass_ "pf-v5-c-form__label-text" ] [ DC.text_ name ]
-            , DC.text_ "   "
-            , DD.span [ DA.klass_ "pf-v5-c-form__label-help", DA.role_ "button" ]
-                [ DD.i [ DA.klass_ "pf-v5-pficon pf-v5-pficon-help" ] []
-                ]
+            -- , DC.text_ "   "
+            -- , DD.span [ DA.klass_ "pf-v5-c-form__label-help", DA.role_ "button" ]
+            --     [ DD.i [ DA.klass_ "pf-v5-pficon pf-v5-pficon-help" ] []
+            --     ]
             ]
         ]
     , DD.div [ DA.klass_ "pf-v5-form__group-control" ]
-        [ DD.span [ DA.klass_ "pf-v5-c-form-control pf-m-required" ]
+        [ DD.span
+            [ DA.klass_ "pf-v5-c-form-control pf-m-required"
+            ]
             [ DD.input
                 [ DA.required_ ""
                 , DA.id_ $ name <> "-form"
@@ -173,9 +178,13 @@ makeSlider :: Array (Tuple String Number) -> Poll Number -> (Number -> Effect Un
 makeSlider stepData currentPercentPoll changePercent = Deku.do
   Tuple setIsMouseDown isMouseDown <- DH.useHot false
   isMouseDownEff <- DH.useRef false isMouseDown
+
   DD.div
     [ DA.klass_ "pf-v5-c-slider"
     , DA.style $ pure "--pf-v5-c-slider--value: " <> (show <$> currentPercentPoll) <> pure "%"
+    , DL.mousemove_ $ onMouseMove isMouseDownEff
+    , DL.mousedown_ $ \_ -> setIsMouseDown true
+    , DL.mouseup_ $ \_ -> setIsMouseDown false
     ]
     [ DD.div [ DA.klass_ "pf-v5-c-slider__main" ]
         [ DD.div [ DA.klass_ "pf-v5-c-slider__rail" ]
@@ -185,10 +194,6 @@ makeSlider stepData currentPercentPoll changePercent = Deku.do
         , DD.div
             [ DA.klass_ "pf-v5-c-slider__thumb"
             , DA.role_ "slider"
-            , DL.mousedown_ $ \_ -> setIsMouseDown true
-            , DL.mouseup_ $ \_ -> setIsMouseDown false
-            , DL.mousemove_ $ onMouseMove isMouseDownEff
-            , DL.mouseleave_ $ \_ -> setIsMouseDown false
             ]
             []
         ]
@@ -222,6 +227,18 @@ makeSlider stepData currentPercentPoll changePercent = Deku.do
             roundedPercent = min 100 (max 0 $ roundNeareastMultiple (100 / (Array.length stepData - 1)) newPercent)
           changePercent (toNumber roundedPercent)
 
+makeSliderForm :: String -> Array (Tuple String Number) -> Poll Number -> (Number -> Effect Unit) -> Nut
+makeSliderForm label stepData currentPercentPoll changePercent =
+  DD.div [ DA.klass_ "pf-v5-c-form__group", DA.style_ "max-width: 500px" ]
+    [ DD.div [ DA.klass_ "pf-v5-c-form__label" ]
+        [ DD.label [ DA.klass_ "pf-v5-c-form__label", DA.for_ $ label <> "-form" ]
+            [ DD.span [ DA.klass_ "pf-v5-c-form__label-text" ] [ DC.text_ label ] ]
+        ]
+    , DD.div [ DA.klass_ "pf-v5-form__group-control" ]
+        [ makeSlider stepData currentPercentPoll changePercent
+        ]
+    ]
+
 getParentXRange :: Event.Event -> Effect (Maybe { left :: Number, right :: Number })
 getParentXRange event =
   runMaybeT do
@@ -238,3 +255,44 @@ rangePercent { left, right } x =
 roundNeareastMultiple :: Int -> Number -> Int
 roundNeareastMultiple multiple val =
   multiple * round (val / toNumber multiple)
+
+makeDropdown :: String -> Poll Boolean -> (Boolean -> Effect Unit) -> Poll String -> Poll (Array (Tuple String (Effect Unit))) -> Nut
+makeDropdown label isOpenPoll setOpen labelPoll menuItems =
+  DD.div [ DA.klass_ "pf-v5-c-form__group", DA.style_ "max-width: 500px" ]
+    [ DD.div [ DA.klass_ "pf-v5-c-form__label" ]
+        [ DD.label [ DA.klass_ "pf-v5-c-form__label", DA.for_ $ label <> "-form" ]
+            [ DD.span [ DA.klass_ "pf-v5-c-form__label-text" ] [ DC.text_ label ] ]
+        ]
+    , DD.div [ DA.klass_ "pf-v5-form__group-control" ]
+        [ DD.div
+            [ DA.klass $ pure "pf-v5-c-dropdown" <> (isOpenPoll <#> if _ then " pf-m-expanded" else "")
+            , DL.click $ isOpenPoll <#> if _ then (\_ -> setOpen false) else (\_ -> setOpen true)
+            ]
+            [ DD.button [ DA.klass_ "pf-v5-c-dropdown__toggle", DA.xtype_ "button" ]
+                [ DD.span [ DA.klass_ "pf-v5-c-dropdown__toggle-text" ] [ DC.text labelPoll ]
+                , DD.span [ DA.klass_ "pf-v5-c-dropdown__toggle-icon" ]
+                    [ DD.i [ DA.klass_ "fas fa-caret-down" ] [] ]
+                ]
+            , menuItems <#~> \itemArr ->
+                isOpenPoll <#~>
+                  if _ then
+                    DD.ul
+                      [ DA.klass_ "pf-v5-c-dropdown__menu"
+                      , DA.role_ "menu"
+                      ] $
+                      itemArr <#> uncurry makeMenuItem
+                  else
+                    DD.ul
+                      [ DA.klass_ "pf-v5-c-dropdown__menu"
+                      , DA.role_ "menu"
+                      , DA.hidden_ ""
+                      ] $
+                      itemArr <#> uncurry makeMenuItem
+            ]
+        ]
+    ]
+  where
+  makeMenuItem label handler =
+    DD.li [ DA.role_ "none", DL.click_ $ \_ -> handler ]
+      [ DD.a [ DA.klass_ "pf-v5-c-dropdown__menu-item", DA.role_ "menuitem" ] [ DC.text_ label ]
+      ]
