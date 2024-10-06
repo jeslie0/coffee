@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -10,7 +11,6 @@ import Control.Monad.IO.Class
 import Data.Aeson
 import Data.ByteString.Lazy qualified as BL
 import Data.HashMap.Strict qualified as Map
-import Data.Hashable (Hashable (..))
 import Data.Proxy (Proxy (..))
 import Data.Text qualified as T
 import GHC.Generics (Generic)
@@ -27,125 +27,55 @@ import WaiAppStatic.Types (unsafeToPiece)
 -- * Types
 
 data Record = Record
-  { id :: T.Text,
-    undertones :: T.Text,
-    aroma :: T.Text,
-    thoughts :: T.Text,
-    rating :: Int
+  { aroma :: Int,
+    acidity :: Int,
+    sweetness :: Int,
+    body :: Int,
+    finish :: Int,
+    rating :: Int,
+    flavour :: T.Text,
+    uuid :: T.Text,
+    coffee :: T.Text
   }
   deriving (Generic)
 
-newtype CoffeeCompany = CC T.Text deriving (Eq, Generic)
-
-newtype CoffeeType = CT T.Text deriving (Eq, Generic)
-
-instance Hashable CoffeeType where
-  hash (CT txt) = hash txt
-  hashWithSalt n (CT txt) = hashWithSalt n txt
-
-instance Hashable CoffeeCompany where
-  hash (CC txt) = hash txt
-  hashWithSalt n (CC txt) = hashWithSalt n txt
-
-newtype Database = DB (Map.HashMap CoffeeCompany (Map.HashMap CoffeeType [Record])) deriving (Generic)
+newtype Database = DB (Map.HashMap T.Text [Record]) deriving (Generic)
 
 instance ToJSON Record
-
-instance ToJSON CoffeeCompany
-
-instance ToJSONKey CoffeeCompany
-
-instance ToJSON CoffeeType
-
-instance ToJSONKey CoffeeType
 
 instance ToJSON Database
 
 instance FromJSON Record
-
-instance FromJSON CoffeeCompany
-
-instance FromJSONKey CoffeeCompany
-
-instance FromJSON CoffeeType
-
-instance FromJSONKey CoffeeType
 
 instance FromJSON Database
 
 -- * Api
 
 type CoffeeApi =
-  "coffee_db" :> Get '[JSON] Database
-    :<|> Capture "coffee_company" T.Text
-      :> Capture "coffee_name" T.Text
-      :> ( Get '[JSON] [Record]
-             :<|> ReqBody '[JSON] Record :> Post '[JSON] ()
-             :<|> Delete '[PlainText] T.Text
-         )
+  "coffee-list.json" :> Get '[JSON] [T.Text]
+    :<|> "coffeeRecord" :> ReqBody '[JSON] Record :> Post '[JSON] ()
 
 type Api =
   "api" :> "v1" :> CoffeeApi
     :<|> Raw
 
-data DatabaseMngr = DBMngr
-  { dbMVar :: MVar Database,
-    jsonPath :: OsPath
-  }
-
-class DBUpdater a where
-  insert :: a -> T.Text -> T.Text -> Record -> IO ()
-
-  -- delete :: a -> T.Text -> IO ()
-  updateDB :: a -> Database -> IO ()
-
-instance DBUpdater DatabaseMngr where
-  insert (DBMngr dbMVar jsonPath) company coffee record = do
-    (DB db) <- takeMVar dbMVar
-    let newDB = Map.update (Just . Map.update (\records -> Just $ record : records) (CT coffee)) (CC company) db
-    commit jsonPath newDB
-    putMVar dbMVar $ DB newDB
-
-  -- delete (DBMngr dbMVar jsonPath) id = do
-  --   (DB db) <- takeMVar dbMVar
-  --   commit jsonPath newDB
-  --   undefined
-
-  updateDB (DBMngr dbMVar jsonPath) newDB = do
-    _ <- takeMVar dbMVar
-    commit jsonPath newDB
-    putMVar dbMVar newDB
-
 server :: FilePath -> DatabaseMngr -> Server Api
 server path mngr =
-  ( getDBHandler mngr
-      :<|> ( \coffeeCo coffee ->
-               getHandler mngr coffeeCo coffee
-                 :<|> postHandler mngr coffeeCo coffee
-                 :<|> deleteHandler mngr coffeeCo coffee
-           )
+  ( getCoffeeListJson
+      :<|> postHandler mngr
   )
     :<|> serveFiles path
 
-getDBHandler :: DatabaseMngr -> Handler Database
-getDBHandler (DBMngr dbMVar _jsonPath) = do
-  DB db <- liftIO $ readMVar dbMVar
-  return $ DB db
-
-getHandler :: DatabaseMngr -> T.Text -> T.Text -> Handler [Record]
-getHandler (DBMngr dbMVar _jsonPath) company coffee = do
-  DB db <- liftIO $ readMVar dbMVar
-  let res = Map.lookup (CC company) db >>= Map.lookup (CT coffee)
-  case res of
+getCoffeeListJson :: Handler [T.Text]
+getCoffeeListJson = do
+  bytes <- liftIO $ BL.readFile "./coffee-list.json"
+  case decode @[T.Text] bytes of
     Nothing -> return []
-    Just rcs -> return rcs
+    Just val -> return val
 
-postHandler :: DatabaseMngr -> T.Text -> T.Text -> Record -> Handler ()
-postHandler mngr company coffee newRecord = do
-  liftIO $ insert mngr company coffee newRecord
-
-deleteHandler :: DatabaseMngr -> T.Text -> T.Text -> Handler T.Text
-deleteHandler = undefined
+postHandler :: DatabaseMngr -> Record -> Handler ()
+postHandler mngr newRecord = do
+  liftIO $ insert mngr newRecord
 
 serveFiles :: FilePath -> Server Raw
 serveFiles path = do
@@ -159,6 +89,37 @@ serveFiles path = do
 
 app :: FilePath -> DatabaseMngr -> Application
 app path mngr = serve (Proxy @Api) $ server path mngr
+
+-- * Database manager
+data DatabaseMngr = DBMngr
+  { dbMVar :: MVar Database,
+    jsonPath :: OsPath
+  }
+
+class DBUpdater a where
+  insert :: a -> Record -> IO ()
+
+  updateDB :: a -> Database -> IO ()
+
+instance DBUpdater DatabaseMngr where
+  insert (DBMngr dbMVar jsonPath) record = do
+    (DB db) <- takeMVar dbMVar
+    let newDB =
+          Map.alter
+            ( \case
+                Just records -> Just $ record : filter (\rcd -> uuid rcd /= uuid record) records
+                Nothing -> Just [record]
+            )
+            (uuid record)
+            db
+    commit jsonPath newDB
+    putMVar dbMVar $ DB newDB
+
+  updateDB (DBMngr dbMVar jsonPath) newDB = do
+    _ <- takeMVar dbMVar
+    commit jsonPath newDB
+    putMVar dbMVar newDB
+
 
 -- * Database
 
@@ -189,12 +150,12 @@ commit ospath val = do
 main :: IO ()
 main = do
   args <- getArgs
-  if null args
-    then putStrLn "No web supplied"
-    else do
-      absPath <- canonicalizePath $ head args
-      print absPath
-      dbPath <- encodeUtf "./database.json"
-      dbMVar <- loadDB dbPath >>= newMVar
-      putStrLn "Running server on 8080..."
-      run 8080 (app absPath $ DBMngr dbMVar dbPath)
+  absPath <-
+    ( if null args
+        then canonicalizePath "./web/dist"
+        else canonicalizePath $ head args
+      )
+  dbPath <- encodeUtf "./database.json"
+  dbMVar <- loadDB dbPath >>= newMVar
+  putStrLn "Running server on 9000..."
+  run 9000 (app absPath $ DBMngr dbMVar dbPath)

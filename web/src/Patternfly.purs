@@ -185,6 +185,7 @@ makeSlider stepData currentPercentPoll changePercent = Deku.do
     , DL.mousemove_ $ onMouseMove isMouseDownEff
     , DL.mousedown_ $ \_ -> setIsMouseDown true
     , DL.mouseup_ $ \_ -> setIsMouseDown false
+    , DL.mouseleave_ $ \_ -> setIsMouseDown false
     ]
     [ DD.div [ DA.klass_ "pf-v5-c-slider__main" ]
         [ DD.div [ DA.klass_ "pf-v5-c-slider__rail" ]

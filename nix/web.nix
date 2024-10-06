@@ -1,4 +1,4 @@
-{self, pkgs, system}:
+{self, pkgs}:
 let spago =
       pkgs.mkSpagoDerivation {
         spagoYaml = "${self}/web/spago.yaml";

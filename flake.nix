@@ -63,7 +63,7 @@
 
               default =
                 (haskellPackages system).callCabal2nix (packageName system) self {};
-              web = import ./nix/web.nix { inherit self system; pkgs = nixpkgsFor.${system}; };
+              web = import ./nix/web.nix { inherit self; pkgs = nixpkgsFor.${system}; };
             } // (
               import ./nix/xCompiled.nix {
                 inherit ghcVersion system nixpkgs extendHaskellPackages self;
@@ -92,8 +92,6 @@
                   [  haskell-language-server
                      pkgs.purescript-language-server-unstable
                      cabal-install
-                     pkgs.cmake
-                     pkgs.alsa-lib
                      pkgs.spago-unstable
                      pkgs.purs-unstable
                      pkgs.nodePackages.npm

@@ -43,6 +43,13 @@ export default defineConfig({
             variables: true
         })],
     server: {
-        open: true
+        open: true,
+        proxy: {
+            '/api/v1/coffee-list.json': {
+                target: 'http://localhost:9000/api/v1/coffee-list.json',
+                changeOrigin: true,
+            }
+        }
+
     }
 })

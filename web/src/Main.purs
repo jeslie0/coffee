@@ -3,6 +3,7 @@ module Main where
 import Prelude
 
 import Api (Api, getExistingCoffees, makeApi)
+import Constants (version)
 import Data.Tuple.Nested ((/\))
 import Deku.Control as DC
 import Deku.Core (Nut)
@@ -46,7 +47,7 @@ header ev setPage =
                         navList
                     ]
                 ]
-            , DD.div [ DA.klass_ "pf-v5-l-flex__item pf-m-align-right" ] [ DC.text_ "v0.1.0" ]
+            , DD.div [ DA.klass_ "pf-v5-l-flex__item pf-m-align-right" ] [ DC.text_ version ]
             ]
         ]
     ]

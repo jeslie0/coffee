@@ -28,19 +28,21 @@ makeApi = new Api
 getLocalStorage :: Effect Storage
 getLocalStorage = window >>= localStorage
 
-sendFormData :: Ref Api -> CoffeeTastingData -> Effect Unit
-sendFormData _ coffeeData = do
-  uuidStr <- UUID.genUUID <#> UUID.toString
+sendFormData :: Ref Api -> CoffeeTastingData -> Effect Unit -> Effect Unit
+sendFormData _ coffeeData onSuccess = do
+  uuidStr <- getUUID
   let updatedData = if coffeeData.uuid == "" then coffeeData { uuid = uuidStr } else coffeeData
   saveDataToStorage updatedData
-  url <- getUrl
+  url <- getApiUrl
   launchAff_ do
-    { status } <- fetch (url <> "coffeeRecord")
+    { ok } <- fetch (url <> "coffeeRecord")
       { method: POST
       , body: Yoga.writeJSON updatedData
       , headers: { "Content-Type": "application/json" }
       }
-    if status /= 200 then liftEffect $ Console.error "Failed to send data to server" else pure unit
+    if not ok
+    then liftEffect $ Console.error "Failed to send data to server"
+    else liftEffect $ onSuccess
 
 saveDataToStorage :: CoffeeTastingData -> Effect Unit
 saveDataToStorage coffeeData = do
@@ -56,8 +58,7 @@ saveDataToStorage coffeeData = do
 
 getExistingCoffees :: Ref Api -> (Array String -> Effect Unit) -> Effect Unit
 getExistingCoffees _ updater = do
-  url <- getUrl
-  Console.log url
+  url <- getApiUrl
   launchAff_ do
     resp@{ ok } <- fetch (url <> "coffee-list.json")
       { method: GET
@@ -76,4 +77,19 @@ getUrl = do
   loc <- window >>= location
   prot <- protocol loc
   hst <- host loc
-  pure $ prot <> "//" <> hst <> "/api/v1"
+  pure $ prot <> "//" <> hst <> "/"
+
+getApiUrl :: Effect String
+getApiUrl =
+  getUrl <#> \url -> url <> "api/v1/"
+
+getUUID :: Effect String
+getUUID = do
+  storage <- getLocalStorage
+  mStr <- getItem "userUUID" storage
+  case mStr of
+    Just str -> pure str
+    Nothing -> do
+      uuidStr <- UUID.genUUID <#> UUID.toString
+      setItem "userUUID" uuidStr storage
+      pure uuidStr

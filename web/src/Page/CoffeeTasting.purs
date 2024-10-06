@@ -13,11 +13,13 @@ import Deku.DOM as DD
 import Deku.DOM.Attributes as DA
 import Deku.DOM.Listeners as DL
 import Deku.Do as Deku
+import Deku.Hooks ((<#~>))
 import Deku.Hooks as DH
 import Effect.Class.Console as Console
 import Effect.Ref (Ref)
 import FRP.Poll (Poll)
 import Patternfly (gallery, galleryItem, makeDropdown, makeSliderForm, makeTextInputForm)
+import SVG.CheckCircle (checkCircle)
 import Web.Event.Event (preventDefault)
 
 data Categories
@@ -45,7 +47,6 @@ coffeeTastingPage api coffeeList =
             [ DD.div [ DA.klass_ "pf-v5-c-card__title" ]
                 [ DD.h2 [ DA.klass_ "pf-v5-c-card__title-text" ] [ DC.text_ "Coffee tasting form" ] ]
             , DD.div [ DA.klass_ "pf-v5-c-card__body" ] [ body api coffeeList ]
-            , DD.div [ DA.klass_ "pf-v5-c-card__footer" ] [ footer ]
             ]
         ]
     ]
@@ -66,6 +67,7 @@ body :: Ref Api -> Poll (Array String) -> Nut
 body api coffeeList = Deku.do
   setCoffeeData /\ coffeeData <- DH.useState initialCoffeeTastingData
   coffeeDataEff <- DH.useRef initialCoffeeTastingData coffeeData
+  setShowSuccess /\ showSuccess <- DH.useState false
 
   setDropdownOpen /\ dropdownOpen <- DH.useState false
 
@@ -73,7 +75,7 @@ body api coffeeList = Deku.do
     formMaker label get set =
       makeSliderForm label rangeArray (toNumber <<< get <$> coffeeData) (\n -> coffeeDataEff >>= \tData -> setCoffeeData $ set tData n)
 
-    send = coffeeDataEff >>= sendFormData api
+    send = coffeeDataEff >>= \fdata -> sendFormData api fdata (setShowSuccess true)
     reset = setCoffeeData initialCoffeeTastingData
 
     coffeeListPoll = coffeeList <#> \arr -> arr <#> \str -> str /\ (coffeeDataEff >>= \cdata -> setCoffeeData $ cdata { coffee = str })
@@ -87,15 +89,15 @@ body api coffeeList = Deku.do
     , formMaker "Finish" (_.finish) (\tData n -> tData { finish = round n })
     , formMaker "Rating" (_.rating) (\tData n -> tData { rating = round n })
     , makeTextInputForm "Flavour" "" (_.flavour <$> coffeeData) (\str -> coffeeDataEff >>= \cf -> setCoffeeData $ cf { flavour = str })
-    , buttons coffeeData send reset
+    , buttons coffeeData send reset showSuccess
     ]
 
   where
-  rangeArray = Array.range 0 5 <#> \n -> show n /\ toNumber n / 5.0 * 100.0
+  rangeArray = let max = 4 in Array.range 0 max <#> \n -> show n /\ toNumber n / toNumber max * 100.0
 
-  buttons coffeeData send reset =
+  buttons coffeeData send reset showSuccess =
     DD.div [ DA.klass_ "pf-m-action" ]
-      [ DD.div [  ]
+      [ DD.span [ ]
           [ DD.button
               [ DA.klass_ "pf-v5-c-button pf-m-primary"
               , DA.xtype_ "submit"
@@ -103,6 +105,7 @@ body api coffeeList = Deku.do
               , DA.disabled $ coffeeData <#> \cdata -> if cdata.coffee == "" then "true" else "false"
               ]
               [ DC.text_ "Submit form" ]
+          , showSuccess <#~> if _ then checkCircle else DD.div [] []
           , DD.button
               [ DA.klass_ "pf-v5-c-button pf-m-link"
               , DA.xtype_ "submit"
@@ -112,9 +115,6 @@ body api coffeeList = Deku.do
           ]
       ]
 
-footer :: Nut
-footer =
-  DD.div [] []
 
 guideBody :: Nut
 guideBody =
