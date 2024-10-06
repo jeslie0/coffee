@@ -63,6 +63,7 @@
 
               default =
                 (haskellPackages system).callCabal2nix (packageName system) self {};
+
               web = import ./nix/web.nix { inherit self; pkgs = nixpkgsFor.${system}; };
             } // (
               import ./nix/xCompiled.nix {

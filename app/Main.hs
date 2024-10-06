@@ -82,7 +82,7 @@ serveFiles path = do
   let initSettings = defaultWebAppSettings path
       staticSettings =
         initSettings
-          { ssRedirectToIndex = True,
+          { ssRedirectToIndex = False,
             ssIndices = [unsafeToPiece "index.html"]
           }
   serveDirectoryWith staticSettings
@@ -91,6 +91,7 @@ app :: FilePath -> DatabaseMngr -> Application
 app path mngr = serve (Proxy @Api) $ server path mngr
 
 -- * Database manager
+
 data DatabaseMngr = DBMngr
   { dbMVar :: MVar Database,
     jsonPath :: OsPath
@@ -119,7 +120,6 @@ instance DBUpdater DatabaseMngr where
     _ <- takeMVar dbMVar
     commit jsonPath newDB
     putMVar dbMVar newDB
-
 
 -- * Database
 
