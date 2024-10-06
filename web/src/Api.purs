@@ -64,7 +64,6 @@ getExistingCoffees _ updater = do
       }
     if not ok then pure unit
     else do
-      liftEffect $Console.logShow ok
       _ <- attempt do
         responseBody <- resp.json
         case Yoga.read_ responseBody :: Maybe (Array String) of

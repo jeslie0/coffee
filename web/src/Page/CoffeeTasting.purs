@@ -120,9 +120,9 @@ guideBody :: Nut
 guideBody =
   DD.div [ DA.klass_ "pf-v5-c-content" ]
     [ DD.p []
-        [ DC.text_ "One of the best ways to improve your coffee drinking experience is to drink coffee that you like and one of the best ways to drink coffee you like is to try and determine what parts of the flavour of coffee you like. The form on this page will help you focus on different aspects of the flavour of coffee, so you can more easily determine which properties you like. There are no wrong answers when it comes to coffee preference." ]
+        [ DC.text_ "One of the best ways to improve your coffee drinking experience is to drink coffee that you truly enjoy. To find coffee that you love, it helps to identify which aspects of its flavour appeal to you most. You can then use this information when selecting which coffees to try. The form on this page is designed to help you focus on different elements of the taste of coffee, so you can more easily determine which properties you like. There are no wrong answers when it comes to coffee preference." ]
     , DD.p []
-        [ DC.text_ "Each of the properties in the form is equipped with a slider. The slider value represents how much of the property you detect, rather than an opinion on that aspect. The Rating slider is for how much you enjoy the coffee. There is also an text box at the bottom to add notes on the coffee, such as any flavours that your detect." ]
+        [ DC.text_ "Each of the properties in the form is accompanied by a slider. The slider value represents how much of the property you detect, rather than an opinion on it. The \"Rating\" slider is for how much you enjoy the coffee. There is also an text box at the bottom to add notes on the coffee, such as any flavours that your detect." ]
     , DD.p []
         [ DC.text_ "The most important part is to have fun and enjoy the magic bean juice!" ]
     ]
