@@ -1,13 +1,22 @@
 {
-  description = "My Haskell project";
+  description = "A webapp to log coffee tasting";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    ps-overlay.url = "github:thomashoneyman/purescript-overlay";
-    mkSpagoDerivation.url = "github:jeslie0/mkSpagoDerivation";
+
+    ps-overlay = {
+      url = "github:thomashoneyman/purescript-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    mkSpagoDerivation = {
+      url = "github:jeslie0/mkSpagoDerivation";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     haskellNix = {
       url = "github:jeslie0/haskell.nix";
-      # inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 

@@ -1,7 +1,7 @@
 {
-  "name": "assistant-pi",
+  "name": "coffee-log",
   "version": "0.1.0",
-  "description": "Frontent for assistant pi",
+  "description": "Frontend for coffee-log",
   "scripts": {
     "test": "spago test",
     "start": "vite src",

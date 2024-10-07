@@ -108,7 +108,7 @@ instance DBUpdater DatabaseMngr where
     let newDB =
           Map.alter
             ( \case
-                Just records -> Just $ record : filter (\rcd -> uuid rcd /= uuid record) records
+                Just records -> Just $ record : filter (\rcd -> coffee rcd /= coffee record) records
                 Nothing -> Just [record]
             )
             (uuid record)

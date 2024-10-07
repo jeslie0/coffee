@@ -15,12 +15,12 @@ let spago =
         pname = "coffee";
         version = "0.1.0";
         src = spago;
-        npmDepsHash = "sha256-zEtMjnOjqtA+1b1gnkt6NeAzPuOOVj7/262+bWLLfbw=";
+        npmDepsHash = "sha256-hK9y/OImxgNUNIMpCK3ksFVZyS03i+GqdGZEiG/E3mM=";
       };
 in
 pkgs.stdenv.mkDerivation {
   pname = "coffee";
   version = "0.1.0";
   src = npmPkg;
-  installPhase = "mkdir $out; cp -r lib/node_modules/assistant-pi/dist/* $out";
+  installPhase = "mkdir $out; cp -r lib/node_modules/coffee-log/dist/* $out";
 }
